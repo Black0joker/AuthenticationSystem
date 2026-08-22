@@ -13,19 +13,19 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        // Configure EF Core with PostgreSQL
+        // Configure EF Core with SQL Server
         var connectionString = configuration.GetConnectionString("DefaultConnection")
             ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
         services.AddDbContext<ApplicationDbContext>(options =>
         {
-            options.UseNpgsql(connectionString, npgsqlOptions =>
+            options.UseSqlServer(connectionString, sqlServerOptions =>
             {
-                npgsqlOptions.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
-                npgsqlOptions.EnableRetryOnFailure(
+                sqlServerOptions.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName);
+                sqlServerOptions.EnableRetryOnFailure(
                     maxRetryCount: 3,
                     maxRetryDelay: TimeSpan.FromSeconds(5),
-                    errorCodesToAdd: null);
+                    errorNumbersToAdd: null);
             });
 
             // Enable sensitive data logging only in development
