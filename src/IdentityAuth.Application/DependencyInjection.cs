@@ -9,6 +9,7 @@ public static class DependencyInjection
     {
         // Register application services
         services.AddScoped<IRegistrationService, RegistrationService>();
+        services.AddScoped<IEmailVerificationService, EmailVerificationService>();
 
         return services;
     }

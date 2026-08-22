@@ -40,9 +40,12 @@ public static class DependencyInjection
 
         // Register repositories
         services.AddScoped<IUserRepository, UserRepository>();
+        services.AddScoped<IEmailVerificationTokenRepository, EmailVerificationTokenRepository>();
 
         // Register security services
         services.AddScoped<IPasswordHasher, PasswordHasher>();
+        services.AddSingleton<ITokenGenerator, TokenGenerator>();
+        services.AddSingleton<ITokenHasher, TokenHasher>();
 
         return services;
     }

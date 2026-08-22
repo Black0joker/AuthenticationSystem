@@ -9,13 +9,16 @@ namespace IdentityAuth.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IRegistrationService _registrationService;
+    private readonly IEmailVerificationService _emailVerificationService;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         IRegistrationService registrationService,
+        IEmailVerificationService emailVerificationService,
         ILogger<AuthController> logger)
     {
         _registrationService = registrationService;
+        _emailVerificationService = emailVerificationService;
         _logger = logger;
     }
 
@@ -40,5 +43,34 @@ public class AuthController : ControllerBase
             actionName: null,
             routeValues: null,
             value: response);
+    }
+
+    /// <summary>
+    /// Verifies a user's email address using a verification token.
+    /// </summary>
+    [HttpPost("verify-email")]
+    [ProducesResponseType(typeof(VerifyEmailResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> VerifyEmail(
+        [FromBody] VerifyEmailRequest request,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Email verification attempt");
+
+        var response = await _emailVerificationService.VerifyEmailAsync(request, cancellationToken);
+
+        if (!response.Success)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Verification Failed",
+                Detail = response.Message
+            });
+        }
+
+        _logger.LogInformation("Email verified successfully");
+
+        return Ok(response);
     }
 }
