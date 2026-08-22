@@ -12,6 +12,7 @@ public class AuthController : ControllerBase
     private readonly IEmailVerificationService _emailVerificationService;
     private readonly ILoginService _loginService;
     private readonly IRefreshTokenService _refreshTokenService;
+    private readonly IPasswordResetService _passwordResetService;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
@@ -19,12 +20,14 @@ public class AuthController : ControllerBase
         IEmailVerificationService emailVerificationService,
         ILoginService loginService,
         IRefreshTokenService refreshTokenService,
+        IPasswordResetService passwordResetService,
         ILogger<AuthController> logger)
     {
         _registrationService = registrationService;
         _emailVerificationService = emailVerificationService;
         _loginService = loginService;
         _refreshTokenService = refreshTokenService;
+        _passwordResetService = passwordResetService;
         _logger = logger;
     }
 
@@ -119,6 +122,53 @@ public class AuthController : ControllerBase
         var response = await _refreshTokenService.RefreshTokenAsync(request, ipAddress, cancellationToken);
 
         _logger.LogInformation("Token refreshed successfully");
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Initiates the password reset flow. Sends a reset token to the user's email.
+    /// Returns a generic response regardless of whether the email exists (prevents enumeration).
+    /// </summary>
+    [HttpPost("forgot-password")]
+    [ProducesResponseType(typeof(ForgotPasswordResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ForgotPassword(
+        [FromBody] ForgotPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Password reset requested");
+
+        var response = await _passwordResetService.ForgotPasswordAsync(request, cancellationToken);
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Resets the user's password using a valid reset token.
+    /// </summary>
+    [HttpPost("reset-password")]
+    [ProducesResponseType(typeof(ResetPasswordResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> ResetPassword(
+        [FromBody] ResetPasswordRequest request,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Password reset attempt");
+
+        var response = await _passwordResetService.ResetPasswordAsync(request, cancellationToken);
+
+        if (!response.Success)
+        {
+            return BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Reset Failed",
+                Detail = response.Message
+            });
+        }
+
+        _logger.LogInformation("Password reset successfully");
 
         return Ok(response);
     }
