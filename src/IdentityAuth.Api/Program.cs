@@ -1,6 +1,7 @@
 using System.Text;
 using System.Threading.RateLimiting;
 using IdentityAuth.Api.Extensions;
+using IdentityAuth.Api.HealthChecks;
 using IdentityAuth.Application;
 using IdentityAuth.Application.Common.Settings;
 using IdentityAuth.Infrastructure;
@@ -24,6 +25,10 @@ builder.Services.AddApplication();
 
 // Register infrastructure layer services (EF Core, Database)
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Configure Health Checks
+builder.Services.AddHealthChecks()
+    .AddCheck<DatabaseHealthCheck>("database", tags: new[] { "ready" });
 
 // Configure JWT Authentication
 var jwtSettings = new JwtSettings();
@@ -195,6 +200,12 @@ var app = builder.Build();
 
 // Configure the HTTP request pipeline.
 
+// Correlation ID middleware (first in pipeline for tracing)
+app.UseCorrelationId();
+
+// Request logging middleware
+app.UseRequestLogging();
+
 // Exception handling middleware (should be early in the pipeline)
 app.UseExceptionHandling();
 
@@ -219,6 +230,17 @@ if (enableRateLimiting && !app.Environment.IsDevelopment())
 app.UseAuthentication();
 
 app.UseAuthorization();
+
+// Health check endpoints
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = _ => false // Liveness: no checks, just confirms the app is running
+});
+
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready") // Readiness: database check
+});
 
 app.MapControllers();
 

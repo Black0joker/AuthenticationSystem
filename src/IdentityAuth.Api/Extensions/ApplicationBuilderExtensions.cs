@@ -25,4 +25,16 @@ public static class ApplicationBuilderExtensions
 
         return app;
     }
+
+    public static IApplicationBuilder UseCorrelationId(this IApplicationBuilder app)
+    {
+        app.UseMiddleware<CorrelationIdMiddleware>();
+        return app;
+    }
+
+    public static IApplicationBuilder UseRequestLogging(this IApplicationBuilder app)
+    {
+        app.UseMiddleware<RequestLoggingMiddleware>();
+        return app;
+    }
 }
