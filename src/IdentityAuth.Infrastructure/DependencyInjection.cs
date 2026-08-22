@@ -1,4 +1,7 @@
+using IdentityAuth.Application.Common.Interfaces;
 using IdentityAuth.Infrastructure.Persistence;
+using IdentityAuth.Infrastructure.Persistence.Repositories;
+using IdentityAuth.Infrastructure.Security;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -30,6 +33,16 @@ public static class DependencyInjection
                 options.EnableSensitiveDataLogging();
             }
         });
+
+        // Register IApplicationDbContext
+        services.AddScoped<IApplicationDbContext>(provider =>
+            provider.GetRequiredService<ApplicationDbContext>());
+
+        // Register repositories
+        services.AddScoped<IUserRepository, UserRepository>();
+
+        // Register security services
+        services.AddScoped<IPasswordHasher, PasswordHasher>();
 
         return services;
     }

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using IdentityAuth.Application.Authentication.Services;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityAuth.Api.Middleware;
@@ -33,6 +34,13 @@ public class ExceptionHandlingMiddleware
 
         var problemDetails = exception switch
         {
+            DuplicateEmailException dupEx => new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "Conflict",
+                Detail = dupEx.Message,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10"
+            },
             ArgumentException argEx => new ProblemDetails
             {
                 Status = StatusCodes.Status400BadRequest,
