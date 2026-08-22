@@ -15,6 +15,7 @@ public static class DependencyInjection
         services.AddScoped<ILoginService, LoginService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<IPasswordResetService, PasswordResetService>();
+        services.AddScoped<IAccountService, AccountService>();
 
         // Register security services
         services.AddScoped<ISecurityEventService, SecurityEventService>();
