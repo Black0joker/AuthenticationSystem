@@ -1,6 +1,10 @@
+using System.Text;
 using IdentityAuth.Api.Extensions;
 using IdentityAuth.Application;
+using IdentityAuth.Application.Common.Settings;
 using IdentityAuth.Infrastructure;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +22,74 @@ builder.Services.AddApplication();
 
 // Register infrastructure layer services (EF Core, Database)
 builder.Services.AddInfrastructure(builder.Configuration);
+
+// Configure JWT Authentication
+var jwtSettings = new JwtSettings();
+builder.Configuration.Bind(JwtSettings.SectionName, jwtSettings);
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+})
+.AddJwtBearer(options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidIssuer = jwtSettings.Issuer,
+        ValidateAudience = true,
+        ValidAudience = jwtSettings.Audience,
+        ValidateIssuerSigningKey = true,
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwtSettings.SecretKey)),
+        ValidateLifetime = true,
+        ClockSkew = TimeSpan.Zero
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnChallenge = context =>
+        {
+            context.HandleResponse();
+            context.Response.StatusCode = StatusCodes.Status401Unauthorized;
+            context.Response.ContentType = "application/problem+json";
+            return context.Response.WriteAsync(
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    status = 401,
+                    title = "Unauthorized",
+                    detail = "You must be authenticated to access this resource.",
+                    type = "https://tools.ietf.org/html/rfc9110#section-15.5.2"
+                }, new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                }));
+        },
+        OnForbidden = context =>
+        {
+            context.Response.StatusCode = StatusCodes.Status403Forbidden;
+            context.Response.ContentType = "application/problem+json";
+            return context.Response.WriteAsync(
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    status = 403,
+                    title = "Forbidden",
+                    detail = "You do not have permission to access this resource.",
+                    type = "https://tools.ietf.org/html/rfc9110#section-15.5.4"
+                }, new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                }));
+        }
+    };
+});
+
+// Configure Authorization policies
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole("Admin"));
+    options.AddPolicy("UserOnly", policy => policy.RequireRole("User"));
+});
 
 // Configure CORS
 builder.Services.AddCors(options =>
@@ -59,6 +131,8 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseCors("Default");
+
+app.UseAuthentication();
 
 app.UseAuthorization();
 
