@@ -11,17 +11,20 @@ public class AuthController : ControllerBase
     private readonly IRegistrationService _registrationService;
     private readonly IEmailVerificationService _emailVerificationService;
     private readonly ILoginService _loginService;
+    private readonly IRefreshTokenService _refreshTokenService;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         IRegistrationService registrationService,
         IEmailVerificationService emailVerificationService,
         ILoginService loginService,
+        IRefreshTokenService refreshTokenService,
         ILogger<AuthController> logger)
     {
         _registrationService = registrationService;
         _emailVerificationService = emailVerificationService;
         _loginService = loginService;
+        _refreshTokenService = refreshTokenService;
         _logger = logger;
     }
 
@@ -78,7 +81,7 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Authenticates a user and returns user information.
+    /// Authenticates a user and returns user information with access and refresh tokens.
     /// </summary>
     [HttpPost("login")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
@@ -91,9 +94,31 @@ public class AuthController : ControllerBase
     {
         _logger.LogInformation("Login attempt for email: {Email}", request.Email);
 
-        var response = await _loginService.LoginAsync(request, cancellationToken);
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var response = await _loginService.LoginAsync(request, ipAddress, cancellationToken);
 
         _logger.LogInformation("User logged in successfully: {UserId}", response.UserId);
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Refreshes the access token using a valid refresh token. Rotates the refresh token.
+    /// </summary>
+    [HttpPost("refresh")]
+    [ProducesResponseType(typeof(RefreshTokenResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Refresh(
+        [FromBody] RefreshTokenRequest request,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Token refresh attempt");
+
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        var response = await _refreshTokenService.RefreshTokenAsync(request, ipAddress, cancellationToken);
+
+        _logger.LogInformation("Token refreshed successfully");
 
         return Ok(response);
     }

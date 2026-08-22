@@ -11,6 +11,7 @@ public static class DependencyInjection
         services.AddScoped<IRegistrationService, RegistrationService>();
         services.AddScoped<IEmailVerificationService, EmailVerificationService>();
         services.AddScoped<ILoginService, LoginService>();
+        services.AddScoped<IRefreshTokenService, RefreshTokenService>();
 
         return services;
     }

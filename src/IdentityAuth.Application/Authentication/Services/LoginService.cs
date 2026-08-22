@@ -9,21 +9,24 @@ public class LoginService : ILoginService
     private readonly IUserRepository _userRepository;
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
+    private readonly IRefreshTokenService _refreshTokenService;
     private readonly IApplicationDbContext _dbContext;
 
     public LoginService(
         IUserRepository userRepository,
         IPasswordHasher passwordHasher,
         IJwtTokenService jwtTokenService,
+        IRefreshTokenService refreshTokenService,
         IApplicationDbContext dbContext)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
+        _refreshTokenService = refreshTokenService;
         _dbContext = dbContext;
     }
 
-    public async Task<LoginResponse> LoginAsync(LoginRequest request, CancellationToken cancellationToken = default)
+    public async Task<LoginResponse> LoginAsync(LoginRequest request, string? ipAddress = null, CancellationToken cancellationToken = default)
     {
         // Normalize email for lookup
         var normalizedEmail = EmailNormalizer.Normalize(request.Email);
@@ -90,6 +93,10 @@ public class LoginService : ILoginService
         // Generate JWT access token
         var accessToken = _jwtTokenService.GenerateAccessToken(user);
 
+        // Generate refresh token
+        var refreshToken = await _refreshTokenService.GenerateRefreshTokenAsync(
+            user.Id, ipAddress, cancellationToken: cancellationToken);
+
         return new LoginResponse
         {
             UserId = user.Id,
@@ -97,6 +104,7 @@ public class LoginService : ILoginService
             FirstName = user.FirstName,
             LastName = user.LastName,
             AccessToken = accessToken,
+            RefreshToken = refreshToken,
             LastLoginAt = user.LastLoginAt.Value
         };
     }

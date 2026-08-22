@@ -2,6 +2,9 @@ using System.Text.Json;
 using IdentityAuth.Application.Authentication.Services;
 using Microsoft.AspNetCore.Mvc;
 
+using InvalidRefreshTokenException = IdentityAuth.Application.Authentication.Services.InvalidRefreshTokenException;
+using RefreshTokenReuseException = IdentityAuth.Application.Authentication.Services.RefreshTokenReuseException;
+
 namespace IdentityAuth.Api.Middleware;
 
 public class ExceptionHandlingMiddleware
@@ -61,6 +64,20 @@ public class ExceptionHandlingMiddleware
                 Title = "Forbidden",
                 Detail = emailEx.Message,
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.4"
+            },
+            InvalidRefreshTokenException refreshEx => new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Unauthorized",
+                Detail = refreshEx.Message,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.2"
+            },
+            RefreshTokenReuseException reuseEx => new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Unauthorized",
+                Detail = reuseEx.Message,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.2"
             },
             ArgumentException argEx => new ProblemDetails
             {
