@@ -41,6 +41,27 @@ public class ExceptionHandlingMiddleware
                 Detail = dupEx.Message,
                 Type = "https://tools.ietf.org/html/rfc9110#section-15.5.10"
             },
+            AuthenticationException authEx => new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Unauthorized",
+                Detail = authEx.Message,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.2"
+            },
+            AccountLockedException lockEx => new ProblemDetails
+            {
+                Status = StatusCodes.Status403Forbidden,
+                Title = "Forbidden",
+                Detail = lockEx.Message,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.4"
+            },
+            EmailNotVerifiedException emailEx => new ProblemDetails
+            {
+                Status = StatusCodes.Status403Forbidden,
+                Title = "Forbidden",
+                Detail = emailEx.Message,
+                Type = "https://tools.ietf.org/html/rfc9110#section-15.5.4"
+            },
             ArgumentException argEx => new ProblemDetails
             {
                 Status = StatusCodes.Status400BadRequest,

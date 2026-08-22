@@ -10,15 +10,18 @@ public class AuthController : ControllerBase
 {
     private readonly IRegistrationService _registrationService;
     private readonly IEmailVerificationService _emailVerificationService;
+    private readonly ILoginService _loginService;
     private readonly ILogger<AuthController> _logger;
 
     public AuthController(
         IRegistrationService registrationService,
         IEmailVerificationService emailVerificationService,
+        ILoginService loginService,
         ILogger<AuthController> logger)
     {
         _registrationService = registrationService;
         _emailVerificationService = emailVerificationService;
+        _loginService = loginService;
         _logger = logger;
     }
 
@@ -70,6 +73,27 @@ public class AuthController : ControllerBase
         }
 
         _logger.LogInformation("Email verified successfully");
+
+        return Ok(response);
+    }
+
+    /// <summary>
+    /// Authenticates a user and returns user information.
+    /// </summary>
+    [HttpPost("login")]
+    [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    public async Task<IActionResult> Login(
+        [FromBody] LoginRequest request,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Login attempt for email: {Email}", request.Email);
+
+        var response = await _loginService.LoginAsync(request, cancellationToken);
+
+        _logger.LogInformation("User logged in successfully: {UserId}", response.UserId);
 
         return Ok(response);
     }
