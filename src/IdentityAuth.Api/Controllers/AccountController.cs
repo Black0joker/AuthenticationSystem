@@ -3,6 +3,7 @@ using IdentityAuth.Application.Authentication.DTOs;
 using IdentityAuth.Application.Authentication.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace IdentityAuth.Api.Controllers;
 
@@ -26,9 +27,11 @@ public class AccountController : ControllerBase
     /// Changes the authenticated user's password.
     /// </summary>
     [HttpPost("change-password")]
+    [EnableRateLimiting("token")]
     [ProducesResponseType(typeof(ChangePasswordResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> ChangePassword(
         [FromBody] ChangePasswordRequest request,
         CancellationToken cancellationToken)
@@ -68,9 +71,11 @@ public class AccountController : ControllerBase
     /// Updates the authenticated user's profile (first name, last name).
     /// </summary>
     [HttpPut("profile")]
+    [EnableRateLimiting("general")]
     [ProducesResponseType(typeof(UpdateProfileResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> UpdateProfile(
         [FromBody] UpdateProfileRequest request,
         CancellationToken cancellationToken)

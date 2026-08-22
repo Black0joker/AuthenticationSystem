@@ -1,9 +1,11 @@
 using System.Text;
+using System.Threading.RateLimiting;
 using IdentityAuth.Api.Extensions;
 using IdentityAuth.Application;
 using IdentityAuth.Application.Common.Settings;
 using IdentityAuth.Infrastructure;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -91,6 +93,82 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("UserOnly", policy => policy.RequireRole("User"));
 });
 
+// Configure Rate Limiting (disabled in Development/Test to allow integration tests)
+var enableRateLimiting = builder.Configuration.GetValue<bool>("RateLimiting:Enabled", true);
+
+if (enableRateLimiting && !builder.Environment.IsDevelopment())
+{
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+        options.OnRejected = async (context, cancellationToken) =>
+        {
+            context.HttpContext.Response.ContentType = "application/problem+json";
+
+            var retryAfter = context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfterValue)
+                ? retryAfterValue.TotalSeconds
+                : 60;
+
+            context.HttpContext.Response.Headers.RetryAfter = ((int)retryAfter).ToString();
+
+            await context.HttpContext.Response.WriteAsync(
+                System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    status = 429,
+                    title = "Too Many Requests",
+                    detail = "You have exceeded the allowed number of requests. Please try again later.",
+                    type = "https://tools.ietf.org/html/rfc6585#section-4"
+                }, new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase
+                }), cancellationToken);
+        };
+
+        // Strict policy for authentication endpoints (login, register, forgot-password)
+        // 5 requests per minute per IP
+        options.AddFixedWindowLimiter("auth", limiterOptions =>
+        {
+            limiterOptions.PermitLimit = 5;
+            limiterOptions.Window = TimeSpan.FromMinutes(1);
+            limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+            limiterOptions.QueueLimit = 0;
+        });
+
+        // Moderate policy for token refresh and password reset
+        // 10 requests per minute per IP
+        options.AddFixedWindowLimiter("token", limiterOptions =>
+        {
+            limiterOptions.PermitLimit = 10;
+            limiterOptions.Window = TimeSpan.FromMinutes(1);
+            limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+            limiterOptions.QueueLimit = 0;
+        });
+
+        // General policy for all other endpoints
+        // 100 requests per minute per IP
+        options.AddFixedWindowLimiter("general", limiterOptions =>
+        {
+            limiterOptions.PermitLimit = 100;
+            limiterOptions.Window = TimeSpan.FromMinutes(1);
+            limiterOptions.QueueProcessingOrder = QueueProcessingOrder.OldestFirst;
+            limiterOptions.QueueLimit = 0;
+        });
+
+        // Global fallback policy
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(context =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 200,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+                    QueueLimit = 0
+                }));
+    });
+}
+
 // Configure CORS
 builder.Services.AddCors(options =>
 {
@@ -131,6 +209,12 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseCors("Default");
+
+// Rate limiting middleware (only when enabled)
+if (enableRateLimiting && !app.Environment.IsDevelopment())
+{
+    app.UseRateLimiter();
+}
 
 app.UseAuthentication();
 

@@ -1,6 +1,7 @@
 using IdentityAuth.Application.Authentication.DTOs;
 using IdentityAuth.Application.Authentication.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace IdentityAuth.Api.Controllers;
 
@@ -35,9 +36,11 @@ public class AuthController : ControllerBase
     /// Registers a new user account.
     /// </summary>
     [HttpPost("register")]
+    [EnableRateLimiting("auth")]
     [ProducesResponseType(typeof(RegisterResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Register(
         [FromBody] RegisterRequest request,
         CancellationToken cancellationToken)
@@ -58,8 +61,10 @@ public class AuthController : ControllerBase
     /// Verifies a user's email address using a verification token.
     /// </summary>
     [HttpPost("verify-email")]
+    [EnableRateLimiting("token")]
     [ProducesResponseType(typeof(VerifyEmailResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> VerifyEmail(
         [FromBody] VerifyEmailRequest request,
         CancellationToken cancellationToken)
@@ -87,10 +92,12 @@ public class AuthController : ControllerBase
     /// Authenticates a user and returns user information with access and refresh tokens.
     /// </summary>
     [HttpPost("login")]
+    [EnableRateLimiting("auth")]
     [ProducesResponseType(typeof(LoginResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status403Forbidden)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Login(
         [FromBody] LoginRequest request,
         CancellationToken cancellationToken)
@@ -109,9 +116,11 @@ public class AuthController : ControllerBase
     /// Refreshes the access token using a valid refresh token. Rotates the refresh token.
     /// </summary>
     [HttpPost("refresh")]
+    [EnableRateLimiting("token")]
     [ProducesResponseType(typeof(RefreshTokenResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Refresh(
         [FromBody] RefreshTokenRequest request,
         CancellationToken cancellationToken)
@@ -130,8 +139,10 @@ public class AuthController : ControllerBase
     /// Logs out the user by revoking the refresh token.
     /// </summary>
     [HttpPost("logout")]
+    [EnableRateLimiting("token")]
     [ProducesResponseType(typeof(LogoutResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> Logout(
         [FromBody] LogoutRequest request,
         CancellationToken cancellationToken)
@@ -152,8 +163,10 @@ public class AuthController : ControllerBase
     /// Returns a generic response regardless of whether the email exists (prevents enumeration).
     /// </summary>
     [HttpPost("forgot-password")]
+    [EnableRateLimiting("auth")]
     [ProducesResponseType(typeof(ForgotPasswordResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> ForgotPassword(
         [FromBody] ForgotPasswordRequest request,
         CancellationToken cancellationToken)
@@ -169,8 +182,10 @@ public class AuthController : ControllerBase
     /// Resets the user's password using a valid reset token.
     /// </summary>
     [HttpPost("reset-password")]
+    [EnableRateLimiting("token")]
     [ProducesResponseType(typeof(ResetPasswordResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status429TooManyRequests)]
     public async Task<IActionResult> ResetPassword(
         [FromBody] ResetPasswordRequest request,
         CancellationToken cancellationToken)
