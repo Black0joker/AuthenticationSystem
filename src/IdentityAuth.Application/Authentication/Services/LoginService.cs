@@ -8,15 +8,18 @@ public class LoginService : ILoginService
 {
     private readonly IUserRepository _userRepository;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IJwtTokenService _jwtTokenService;
     private readonly IApplicationDbContext _dbContext;
 
     public LoginService(
         IUserRepository userRepository,
         IPasswordHasher passwordHasher,
+        IJwtTokenService jwtTokenService,
         IApplicationDbContext dbContext)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
+        _jwtTokenService = jwtTokenService;
         _dbContext = dbContext;
     }
 
@@ -84,12 +87,16 @@ public class LoginService : ILoginService
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
+        // Generate JWT access token
+        var accessToken = _jwtTokenService.GenerateAccessToken(user);
+
         return new LoginResponse
         {
             UserId = user.Id,
             Email = user.Email,
             FirstName = user.FirstName,
             LastName = user.LastName,
+            AccessToken = accessToken,
             LastLoginAt = user.LastLoginAt.Value
         };
     }

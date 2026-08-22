@@ -170,11 +170,11 @@ public class LoginTests : IClassFixture<CustomWebApplicationFactory>
     public async Task Login_CaseInsensitiveEmail_Works()
     {
         // Arrange
-        await RegisterAndVerifyUserAsync("casetest@example.com");
+        await RegisterAndVerifyUserAsync("logincasetest@example.com");
 
         // Act - login with different case
         var response = await _client.PostAsJsonAsync("/api/auth/login",
-            new LoginRequest { Email = "CASETEST@EXAMPLE.COM", Password = "StrongPass1!" });
+            new LoginRequest { Email = "LOGINCASETEST@EXAMPLE.COM", Password = "StrongPass1!" });
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);

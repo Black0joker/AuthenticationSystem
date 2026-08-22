@@ -1,4 +1,5 @@
 using IdentityAuth.Application.Common.Interfaces;
+using IdentityAuth.Application.Common.Settings;
 using IdentityAuth.Infrastructure.Persistence;
 using IdentityAuth.Infrastructure.Persistence.Repositories;
 using IdentityAuth.Infrastructure.Security;
@@ -46,6 +47,12 @@ public static class DependencyInjection
         services.AddScoped<IPasswordHasher, PasswordHasher>();
         services.AddSingleton<ITokenGenerator, TokenGenerator>();
         services.AddSingleton<ITokenHasher, TokenHasher>();
+
+        // Configure JWT settings
+        var jwtSettings = new JwtSettings();
+        configuration.Bind(JwtSettings.SectionName, jwtSettings);
+        services.AddSingleton(jwtSettings);
+        services.AddSingleton<IJwtTokenService, JwtTokenService>();
 
         return services;
     }
