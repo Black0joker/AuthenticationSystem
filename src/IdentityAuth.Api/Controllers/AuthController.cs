@@ -127,6 +127,27 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
+    /// Logs out the user by revoking the refresh token.
+    /// </summary>
+    [HttpPost("logout")]
+    [ProducesResponseType(typeof(LogoutResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status400BadRequest)]
+    public async Task<IActionResult> Logout(
+        [FromBody] LogoutRequest request,
+        CancellationToken cancellationToken)
+    {
+        _logger.LogInformation("Logout attempt");
+
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString();
+        await _refreshTokenService.RevokeTokenAsync(request.RefreshToken, ipAddress, cancellationToken);
+
+        return Ok(new LogoutResponse
+        {
+            Message = "Logged out successfully."
+        });
+    }
+
+    /// <summary>
     /// Initiates the password reset flow. Sends a reset token to the user's email.
     /// Returns a generic response regardless of whether the email exists (prevents enumeration).
     /// </summary>

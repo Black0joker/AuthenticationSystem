@@ -1,4 +1,6 @@
 using IdentityAuth.Application.Authentication.Services;
+using IdentityAuth.Application.Common.Interfaces;
+using IdentityAuth.Application.Security.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace IdentityAuth.Application;
@@ -13,6 +15,9 @@ public static class DependencyInjection
         services.AddScoped<ILoginService, LoginService>();
         services.AddScoped<IRefreshTokenService, RefreshTokenService>();
         services.AddScoped<IPasswordResetService, PasswordResetService>();
+
+        // Register security services
+        services.AddScoped<ISecurityEventService, SecurityEventService>();
 
         return services;
     }

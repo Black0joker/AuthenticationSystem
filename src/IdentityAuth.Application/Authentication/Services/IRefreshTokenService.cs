@@ -13,4 +13,9 @@ public interface IRefreshTokenService
     /// Refreshes the access token using a valid refresh token. Rotates the refresh token.
     /// </summary>
     Task<RefreshTokenResponse> RefreshTokenAsync(RefreshTokenRequest request, string? ipAddress = null, CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// Revokes a specific refresh token (used during logout).
+    /// </summary>
+    Task RevokeTokenAsync(string refreshToken, string? ipAddress = null, CancellationToken cancellationToken = default);
 }

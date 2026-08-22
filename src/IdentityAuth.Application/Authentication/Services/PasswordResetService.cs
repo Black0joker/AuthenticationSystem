@@ -14,6 +14,7 @@ public class PasswordResetService : IPasswordResetService
     private readonly IPasswordHasher _passwordHasher;
     private readonly ITokenGenerator _tokenGenerator;
     private readonly ITokenHasher _tokenHasher;
+    private readonly ISecurityEventService _securityEventService;
     private readonly IApplicationDbContext _dbContext;
 
     public PasswordResetService(
@@ -22,6 +23,7 @@ public class PasswordResetService : IPasswordResetService
         IPasswordHasher passwordHasher,
         ITokenGenerator tokenGenerator,
         ITokenHasher tokenHasher,
+        ISecurityEventService securityEventService,
         IApplicationDbContext dbContext)
     {
         _userRepository = userRepository;
@@ -29,6 +31,7 @@ public class PasswordResetService : IPasswordResetService
         _passwordHasher = passwordHasher;
         _tokenGenerator = tokenGenerator;
         _tokenHasher = tokenHasher;
+        _securityEventService = securityEventService;
         _dbContext = dbContext;
     }
 
@@ -41,7 +44,6 @@ public class PasswordResetService : IPasswordResetService
         var user = await _userRepository.GetByEmailNormalizedAsync(normalizedEmail, cancellationToken);
 
         // Always return the same message to prevent user enumeration
-        // Whether or not the user exists, we return a generic response
         if (user is null)
         {
             return new ForgotPasswordResponse
@@ -56,8 +58,12 @@ public class PasswordResetService : IPasswordResetService
         // Generate new reset token
         await GenerateResetTokenAsync(user.Id, cancellationToken);
 
-        // In production, send the token via email here
-        // For now, we just acknowledge the request
+        // Log security event
+        await _securityEventService.LogEventAsync(
+            SecurityEventType.PasswordResetRequested,
+            userId: user.Id,
+            metadata: $"Email: {user.Email}",
+            cancellationToken: cancellationToken);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
@@ -126,10 +132,16 @@ public class PasswordResetService : IPasswordResetService
         // Invalidate all other reset tokens for this user
         await _resetTokenRepository.InvalidateAllUserTokensAsync(user.Id, cancellationToken);
 
-        // Re-mark the current token as used (InvalidateAllUserTokensAsync might have set UsedAt)
+        // Re-mark the current token as used
         resetToken.UsedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Log security event
+        await _securityEventService.LogEventAsync(
+            SecurityEventType.PasswordResetCompleted,
+            userId: user.Id,
+            cancellationToken: cancellationToken);
 
         return new ResetPasswordResponse
         {

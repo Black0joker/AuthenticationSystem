@@ -11,15 +11,18 @@ public class RegistrationService : IRegistrationService
 {
     private readonly IUserRepository _userRepository;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly ISecurityEventService _securityEventService;
     private readonly IApplicationDbContext _dbContext;
 
     public RegistrationService(
         IUserRepository userRepository,
         IPasswordHasher passwordHasher,
+        ISecurityEventService securityEventService,
         IApplicationDbContext dbContext)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
+        _securityEventService = securityEventService;
         _dbContext = dbContext;
     }
 
@@ -68,6 +71,13 @@ public class RegistrationService : IRegistrationService
 
         // Save all changes
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Log security event
+        await _securityEventService.LogEventAsync(
+            SecurityEventType.UserRegistered,
+            userId: user.Id,
+            metadata: $"Email: {user.Email}",
+            cancellationToken: cancellationToken);
 
         return new RegisterResponse
         {

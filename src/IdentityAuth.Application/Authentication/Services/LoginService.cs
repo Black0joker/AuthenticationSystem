@@ -1,6 +1,7 @@
 using IdentityAuth.Application.Authentication.DTOs;
 using IdentityAuth.Application.Common.Helpers;
 using IdentityAuth.Application.Common.Interfaces;
+using IdentityAuth.Domain.Entities;
 
 namespace IdentityAuth.Application.Authentication.Services;
 
@@ -10,6 +11,7 @@ public class LoginService : ILoginService
     private readonly IPasswordHasher _passwordHasher;
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IRefreshTokenService _refreshTokenService;
+    private readonly ISecurityEventService _securityEventService;
     private readonly IApplicationDbContext _dbContext;
 
     public LoginService(
@@ -17,12 +19,14 @@ public class LoginService : ILoginService
         IPasswordHasher passwordHasher,
         IJwtTokenService jwtTokenService,
         IRefreshTokenService refreshTokenService,
+        ISecurityEventService securityEventService,
         IApplicationDbContext dbContext)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
         _jwtTokenService = jwtTokenService;
         _refreshTokenService = refreshTokenService;
+        _securityEventService = securityEventService;
         _dbContext = dbContext;
     }
 
@@ -37,6 +41,12 @@ public class LoginService : ILoginService
         // Use generic error message to prevent user enumeration
         if (user is null)
         {
+            await _securityEventService.LogEventAsync(
+                SecurityEventType.LoginFailed,
+                ipAddress: ipAddress,
+                metadata: $"Email: {request.Email} - User not found",
+                cancellationToken: cancellationToken);
+
             throw new AuthenticationException("Invalid email or password.");
         }
 
@@ -68,9 +78,27 @@ public class LoginService : ILoginService
             {
                 user.IsLocked = true;
                 user.LockoutEnd = DateTime.UtcNow.AddMinutes(30);
-            }
 
-            await _dbContext.SaveChangesAsync(cancellationToken);
+                await _dbContext.SaveChangesAsync(cancellationToken);
+
+                await _securityEventService.LogEventAsync(
+                    SecurityEventType.AccountLocked,
+                    userId: user.Id,
+                    ipAddress: ipAddress,
+                    metadata: "Account locked after 5 failed login attempts",
+                    cancellationToken: cancellationToken);
+            }
+            else
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken);
+
+                await _securityEventService.LogEventAsync(
+                    SecurityEventType.LoginFailed,
+                    userId: user.Id,
+                    ipAddress: ipAddress,
+                    metadata: $"Failed attempt {user.FailedLoginAttempts}/5",
+                    cancellationToken: cancellationToken);
+            }
 
             // Generic error to prevent user enumeration
             throw new AuthenticationException("Invalid email or password.");
@@ -89,6 +117,13 @@ public class LoginService : ILoginService
         user.LastLoginAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Log successful login
+        await _securityEventService.LogEventAsync(
+            SecurityEventType.LoginSucceeded,
+            userId: user.Id,
+            ipAddress: ipAddress,
+            cancellationToken: cancellationToken);
 
         // Generate JWT access token
         var accessToken = _jwtTokenService.GenerateAccessToken(user);

@@ -13,19 +13,22 @@ public class RefreshTokenService : IRefreshTokenService
     private readonly ITokenGenerator _tokenGenerator;
     private readonly ITokenHasher _tokenHasher;
     private readonly IJwtTokenService _jwtTokenService;
+    private readonly ISecurityEventService _securityEventService;
 
     public RefreshTokenService(
         IApplicationDbContext dbContext,
         IRefreshTokenRepository refreshTokenRepository,
         ITokenGenerator tokenGenerator,
         ITokenHasher tokenHasher,
-        IJwtTokenService jwtTokenService)
+        IJwtTokenService jwtTokenService,
+        ISecurityEventService securityEventService)
     {
         _dbContext = dbContext;
         _refreshTokenRepository = refreshTokenRepository;
         _tokenGenerator = tokenGenerator;
         _tokenHasher = tokenHasher;
         _jwtTokenService = jwtTokenService;
+        _securityEventService = securityEventService;
     }
 
     public async Task<string> GenerateRefreshTokenAsync(Guid userId, string? ipAddress = null, Guid? familyId = null, CancellationToken cancellationToken = default)
@@ -70,6 +73,14 @@ public class RefreshTokenService : IRefreshTokenService
             await _refreshTokenRepository.RevokeAllUserTokensAsync(storedToken.UserId, ipAddress, cancellationToken);
             await _dbContext.SaveChangesAsync(cancellationToken);
 
+            // Log reuse detection
+            await _securityEventService.LogEventAsync(
+                SecurityEventType.RefreshTokenReuseDetected,
+                userId: storedToken.UserId,
+                ipAddress: ipAddress,
+                metadata: $"FamilyId: {storedToken.FamilyId}",
+                cancellationToken: cancellationToken);
+
             throw new RefreshTokenReuseException("Refresh token reuse detected. All sessions have been revoked.");
         }
 
@@ -89,6 +100,14 @@ public class RefreshTokenService : IRefreshTokenService
 
         // ROTATION: Revoke the current token and create a new one
         await _refreshTokenRepository.RevokeAsync(storedToken, ipAddress, cancellationToken);
+
+        // Log token revocation
+        await _securityEventService.LogEventAsync(
+            SecurityEventType.RefreshTokenRevoked,
+            userId: storedToken.UserId,
+            ipAddress: ipAddress,
+            metadata: "Token rotated",
+            cancellationToken: cancellationToken);
 
         // Generate new refresh token in the same family
         var newPlainToken = await GenerateRefreshTokenAsync(
@@ -110,6 +129,28 @@ public class RefreshTokenService : IRefreshTokenService
             AccessToken = accessToken,
             RefreshToken = newPlainToken
         };
+    }
+
+    /// <summary>
+    /// Revokes a specific refresh token (used during logout).
+    /// </summary>
+    public async Task RevokeTokenAsync(string refreshToken, string? ipAddress = null, CancellationToken cancellationToken = default)
+    {
+        var tokenHash = _tokenHasher.HashToken(refreshToken);
+        var storedToken = await _refreshTokenRepository.GetByTokenHashAsync(tokenHash, cancellationToken);
+
+        if (storedToken is not null && storedToken.IsActive)
+        {
+            await _refreshTokenRepository.RevokeAsync(storedToken, ipAddress, cancellationToken);
+
+            await _securityEventService.LogEventAsync(
+                SecurityEventType.Logout,
+                userId: storedToken.UserId,
+                ipAddress: ipAddress,
+                cancellationToken: cancellationToken);
+
+            await _dbContext.SaveChangesAsync(cancellationToken);
+        }
     }
 }
 
