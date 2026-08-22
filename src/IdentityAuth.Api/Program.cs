@@ -5,6 +5,7 @@ using IdentityAuth.Api.HealthChecks;
 using IdentityAuth.Application;
 using IdentityAuth.Application.Common.Settings;
 using IdentityAuth.Infrastructure;
+using IdentityAuth.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
@@ -197,6 +198,15 @@ builder.Logging.AddConsole();
 builder.Logging.AddDebug();
 
 var app = builder.Build();
+
+// Apply database migrations and seed data (production/staging only, not in tests)
+var autoMigrate = app.Configuration.GetValue<bool>("Database:AutoMigrate", false);
+var autoSeed = app.Configuration.GetValue<bool>("Database:AutoSeed", false);
+
+if ((autoMigrate || autoSeed) && !app.Environment.IsDevelopment())
+{
+    await DatabaseSeeder.SeedAsync(app.Services);
+}
 
 // Configure the HTTP request pipeline.
 

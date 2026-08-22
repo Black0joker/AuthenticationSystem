@@ -11,124 +11,227 @@ public static class DatabaseSeeder
     {
         using var scope = serviceProvider.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+        var passwordHasher = scope.ServiceProvider.GetRequiredService<Application.Common.Interfaces.IPasswordHasher>();
         var logger = scope.ServiceProvider.GetRequiredService<ILogger<ApplicationDbContext>>();
 
         try
         {
+            // Apply pending migrations
             await context.Database.MigrateAsync();
 
-            // Seed default roles
-            if (!await context.Roles.AnyAsync())
-            {
-                var roles = new List<Role>
-                {
-                    new Role
-                    {
-                        Id = Guid.NewGuid(),
-                        Name = "User",
-                        NormalizedName = "USER",
-                        Description = "Standard user role",
-                        CreatedAt = DateTime.UtcNow
-                    },
-                    new Role
-                    {
-                        Id = Guid.NewGuid(),
-                        Name = "Admin",
-                        NormalizedName = "ADMIN",
-                        Description = "Administrator role with full access",
-                        CreatedAt = DateTime.UtcNow
-                    }
-                };
+            // Seed roles
+            await SeedRolesAsync(context);
 
-                await context.Roles.AddRangeAsync(roles);
-                await context.SaveChangesAsync();
+            // Seed permissions
+            await SeedPermissionsAsync(context);
 
-                logger.LogInformation("Seeded {Count} roles", roles.Count);
-            }
+            // Seed role-permission assignments
+            await SeedRolePermissionsAsync(context);
 
-            // Seed default permissions
-            if (!await context.Permissions.AnyAsync())
-            {
-                var permissions = new List<Permission>
-                {
-                    new Permission
-                    {
-                        Id = Guid.NewGuid(),
-                        Name = "users.read",
-                        Description = "Can read user data",
-                        CreatedAt = DateTime.UtcNow
-                    },
-                    new Permission
-                    {
-                        Id = Guid.NewGuid(),
-                        Name = "users.write",
-                        Description = "Can create and update users",
-                        CreatedAt = DateTime.UtcNow
-                    },
-                    new Permission
-                    {
-                        Id = Guid.NewGuid(),
-                        Name = "users.delete",
-                        Description = "Can delete users",
-                        CreatedAt = DateTime.UtcNow
-                    },
-                    new Permission
-                    {
-                        Id = Guid.NewGuid(),
-                        Name = "roles.manage",
-                        Description = "Can manage roles and permissions",
-                        CreatedAt = DateTime.UtcNow
-                    }
-                };
+            // Seed default admin user
+            await SeedAdminUserAsync(context, passwordHasher);
 
-                await context.Permissions.AddRangeAsync(permissions);
-                await context.SaveChangesAsync();
-
-                logger.LogInformation("Seeded {Count} permissions", permissions.Count);
-
-                // Assign all permissions to Admin role
-                var adminRole = await context.Roles
-                    .FirstOrDefaultAsync(r => r.NormalizedName == "ADMIN");
-
-                if (adminRole != null)
-                {
-                    var rolePermissions = permissions.Select(p => new RolePermission
-                    {
-                        RoleId = adminRole.Id,
-                        PermissionId = p.Id
-                    }).ToList();
-
-                    await context.RolePermissions.AddRangeAsync(rolePermissions);
-                    await context.SaveChangesAsync();
-
-                    logger.LogInformation("Assigned {Count} permissions to Admin role", rolePermissions.Count);
-                }
-
-                // Assign users.read to User role
-                var userRole = await context.Roles
-                    .FirstOrDefaultAsync(r => r.NormalizedName == "USER");
-
-                if (userRole != null)
-                {
-                    var usersReadPermission = permissions.FirstOrDefault(p => p.Name == "users.read");
-                    if (usersReadPermission != null)
-                    {
-                        await context.RolePermissions.AddAsync(new RolePermission
-                        {
-                            RoleId = userRole.Id,
-                            PermissionId = usersReadPermission.Id
-                        });
-                        await context.SaveChangesAsync();
-
-                        logger.LogInformation("Assigned users.read permission to User role");
-                    }
-                }
-            }
+            logger.LogInformation("Database seeding completed successfully.");
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "An error occurred while seeding the database");
+            logger.LogError(ex, "An error occurred while seeding the database.");
             throw;
         }
+    }
+
+    private static async Task SeedRolesAsync(ApplicationDbContext context)
+    {
+        var roles = new[]
+        {
+            new Role
+            {
+                Id = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567801"),
+                Name = "Admin",
+                NormalizedName = "ADMIN",
+                Description = "Full system access and administrative privileges",
+                CreatedAt = DateTime.UtcNow
+            },
+            new Role
+            {
+                Id = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567802"),
+                Name = "User",
+                NormalizedName = "USER",
+                Description = "Standard user access",
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        foreach (var role in roles)
+        {
+            var exists = await context.Roles.AnyAsync(r => r.NormalizedName == role.NormalizedName);
+            if (!exists)
+            {
+                await context.Roles.AddAsync(role);
+            }
+        }
+
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task SeedPermissionsAsync(ApplicationDbContext context)
+    {
+        var permissions = new[]
+        {
+            new Permission
+            {
+                Id = Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567901"),
+                Name = "users.read",
+                Description = "View user profiles",
+                CreatedAt = DateTime.UtcNow
+            },
+            new Permission
+            {
+                Id = Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567902"),
+                Name = "users.write",
+                Description = "Create and update users",
+                CreatedAt = DateTime.UtcNow
+            },
+            new Permission
+            {
+                Id = Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567903"),
+                Name = "users.delete",
+                Description = "Delete users",
+                CreatedAt = DateTime.UtcNow
+            },
+            new Permission
+            {
+                Id = Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567904"),
+                Name = "roles.manage",
+                Description = "Manage roles and permissions",
+                CreatedAt = DateTime.UtcNow
+            },
+            new Permission
+            {
+                Id = Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567905"),
+                Name = "security.audit",
+                Description = "View security audit logs",
+                CreatedAt = DateTime.UtcNow
+            },
+            new Permission
+            {
+                Id = Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567906"),
+                Name = "profile.read",
+                Description = "View own profile",
+                CreatedAt = DateTime.UtcNow
+            },
+            new Permission
+            {
+                Id = Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567907"),
+                Name = "profile.write",
+                Description = "Update own profile",
+                CreatedAt = DateTime.UtcNow
+            }
+        };
+
+        foreach (var permission in permissions)
+        {
+            var exists = await context.Permissions.AnyAsync(p => p.Name == permission.Name);
+            if (!exists)
+            {
+                await context.Permissions.AddAsync(permission);
+            }
+        }
+
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task SeedRolePermissionsAsync(ApplicationDbContext context)
+    {
+        var adminRoleId = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567801");
+        var userRoleId = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567802");
+
+        // Admin gets all permissions
+        var allPermissionIds = new[]
+        {
+            Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567901"),
+            Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567902"),
+            Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567903"),
+            Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567904"),
+            Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567905"),
+            Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567906"),
+            Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567907")
+        };
+
+        // User gets profile permissions only
+        var userPermissionIds = new[]
+        {
+            Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567906"),
+            Guid.Parse("b1b2c3d4-e5f6-7890-abcd-ef1234567907")
+        };
+
+        foreach (var permissionId in allPermissionIds)
+        {
+            var exists = await context.RolePermissions.AnyAsync(
+                rp => rp.RoleId == adminRoleId && rp.PermissionId == permissionId);
+            if (!exists)
+            {
+                await context.RolePermissions.AddAsync(new RolePermission
+                {
+                    RoleId = adminRoleId,
+                    PermissionId = permissionId
+                });
+            }
+        }
+
+        foreach (var permissionId in userPermissionIds)
+        {
+            var exists = await context.RolePermissions.AnyAsync(
+                rp => rp.RoleId == userRoleId && rp.PermissionId == permissionId);
+            if (!exists)
+            {
+                await context.RolePermissions.AddAsync(new RolePermission
+                {
+                    RoleId = userRoleId,
+                    PermissionId = permissionId
+                });
+            }
+        }
+
+        await context.SaveChangesAsync();
+    }
+
+    private static async Task SeedAdminUserAsync(ApplicationDbContext context, Application.Common.Interfaces.IPasswordHasher passwordHasher)
+    {
+        var adminEmail = "admin@identityauth.com";
+        var normalizedEmail = adminEmail.ToUpperInvariant();
+
+        var exists = await context.Users.AnyAsync(u => u.NormalizedEmail == normalizedEmail);
+        if (exists)
+        {
+            return;
+        }
+
+        var adminUser = new User
+        {
+            Id = Guid.Parse("c1b2c3d4-e5f6-7890-abcd-ef1234567801"),
+            Email = adminEmail,
+            NormalizedEmail = normalizedEmail,
+            PasswordHash = passwordHasher.HashPassword("Admin@123456"),
+            FirstName = "System",
+            LastName = "Administrator",
+            IsEmailVerified = true,
+            IsLocked = false,
+            FailedLoginAttempts = 0,
+            SecurityStamp = Guid.NewGuid().ToString(),
+            CreatedAt = DateTime.UtcNow
+        };
+
+        await context.Users.AddAsync(adminUser);
+
+        // Assign Admin role
+        var adminRoleId = Guid.Parse("a1b2c3d4-e5f6-7890-abcd-ef1234567801");
+        await context.UserRoles.AddAsync(new UserRole
+        {
+            UserId = adminUser.Id,
+            RoleId = adminRoleId
+        });
+
+        await context.SaveChangesAsync();
     }
 }
