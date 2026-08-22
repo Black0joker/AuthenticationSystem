@@ -9,6 +9,7 @@ using IdentityAuth.Infrastructure.Persistence;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
+using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -225,6 +226,11 @@ app.UseSecurityHeaders();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
+    app.MapScalarApiReference(options =>
+    {
+        options.Title = "IdentityAuth API";
+        options.Theme = Scalar.AspNetCore.ScalarTheme.Purple;
+    });
 }
 
 app.UseHttpsRedirection();
