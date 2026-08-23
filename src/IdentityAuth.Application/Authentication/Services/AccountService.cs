@@ -1,4 +1,5 @@
 using IdentityAuth.Application.Authentication.DTOs;
+using IdentityAuth.Application.Common.Helpers;
 using IdentityAuth.Application.Common.Interfaces;
 using IdentityAuth.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -90,9 +91,9 @@ public class AccountService : IAccountService
             throw new KeyNotFoundException("User not found.");
         }
 
-        // Update profile fields
-        user.FirstName = request.FirstName.Trim();
-        user.LastName = request.LastName.Trim();
+        // Update profile fields (sanitized to prevent XSS)
+        user.FirstName = InputSanitizer.Sanitize(request.FirstName);
+        user.LastName = InputSanitizer.Sanitize(request.LastName);
         user.UpdatedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync(cancellationToken);
