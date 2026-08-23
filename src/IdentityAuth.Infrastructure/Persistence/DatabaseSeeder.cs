@@ -16,8 +16,15 @@ public static class DatabaseSeeder
 
         try
         {
-            // Apply pending migrations
-            await context.Database.MigrateAsync();
+            // Apply pending migrations (skip for InMemory provider used in tests)
+            if (context.Database.IsRelational())
+            {
+                await context.Database.MigrateAsync();
+            }
+            else
+            {
+                await context.Database.EnsureCreatedAsync();
+            }
 
             // Seed roles
             await SeedRolesAsync(context);

@@ -17,7 +17,24 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 
 // Configure OpenAPI/Swagger
-builder.Services.AddOpenApi();
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer((document, _, _) =>
+    {
+        var securityScheme = new Microsoft.OpenApi.OpenApiSecurityScheme
+        {
+            Type = Microsoft.OpenApi.SecuritySchemeType.Http,
+            In = Microsoft.OpenApi.ParameterLocation.Header,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            Description = "Paste your JWT access token obtained from /api/auth/login"
+        };
+        document.Components ??= new Microsoft.OpenApi.OpenApiComponents();
+        document.Components.SecuritySchemes ??= new Dictionary<string, Microsoft.OpenApi.IOpenApiSecurityScheme>();
+        document.Components.SecuritySchemes.Add("Bearer", securityScheme);
+        return Task.CompletedTask;
+    });
+});
 
 // Configure Problem Details for standardized error responses
 builder.Services.AddProblemDetails();
@@ -229,7 +246,12 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference(options =>
     {
         options.Title = "IdentityAuth API";
-        options.Theme = Scalar.AspNetCore.ScalarTheme.Purple;
+        options.Theme = ScalarTheme.Purple;
+        options.AddPreferredSecuritySchemes("Bearer");
+        options.AddHttpAuthentication("Bearer", auth =>
+        {
+            auth.Token = "";
+        });
     });
 }
 

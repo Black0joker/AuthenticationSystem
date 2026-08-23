@@ -4,6 +4,7 @@ using IdentityAuth.Application.Common.Interfaces;
 using IdentityAuth.Application.Common.Validators;
 using IdentityAuth.Domain.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 
 namespace IdentityAuth.Application.Authentication.Services;
 
@@ -13,17 +14,23 @@ public class RegistrationService : IRegistrationService
     private readonly IPasswordHasher _passwordHasher;
     private readonly ISecurityEventService _securityEventService;
     private readonly IApplicationDbContext _dbContext;
+    private readonly IEmailVerificationService _emailVerificationService;
+    private readonly ILogger<RegistrationService> _logger;
 
     public RegistrationService(
         IUserRepository userRepository,
         IPasswordHasher passwordHasher,
         ISecurityEventService securityEventService,
-        IApplicationDbContext dbContext)
+        IApplicationDbContext dbContext,
+        IEmailVerificationService emailVerificationService,
+        ILogger<RegistrationService> logger)
     {
         _userRepository = userRepository;
         _passwordHasher = passwordHasher;
         _securityEventService = securityEventService;
         _dbContext = dbContext;
+        _emailVerificationService = emailVerificationService;
+        _logger = logger;
     }
 
     public async Task<RegisterResponse> RegisterAsync(RegisterRequest request, CancellationToken cancellationToken = default)
@@ -71,6 +78,13 @@ public class RegistrationService : IRegistrationService
 
         // Save all changes
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Generate email verification token
+        var verificationToken = await _emailVerificationService.GenerateVerificationTokenAsync(user.Id, cancellationToken);
+
+        // Log the verification token (in production, this would be sent via email)
+        _logger.LogInformation("Email verification token generated for user {UserId} ({Email}): {Token}",
+            user.Id, user.Email, verificationToken);
 
         // Log security event
         await _securityEventService.LogEventAsync(
