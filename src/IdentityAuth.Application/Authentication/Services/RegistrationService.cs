@@ -70,28 +70,42 @@ public class RegistrationService : IRegistrationService
             CreatedAt = DateTime.UtcNow
         };
 
-        // Persist the user
-        await _userRepository.AddAsync(user, cancellationToken);
+        // Wrap user creation, role assignment, and token generation in a transaction
+        // to prevent inconsistent state if any step fails.
+        // Transactions are only supported on relational providers (skipped for InMemory in tests).
+        if (_dbContext.Database.IsRelational())
+        {
+            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-        // Assign default role
-        await AssignDefaultRoleAsync(user, cancellationToken);
+            try
+            {
+                await ExecuteRegistrationCoreAsync(user, cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        }
+        else
+        {
+            await ExecuteRegistrationCoreAsync(user, cancellationToken);
+        }
 
-        // Save all changes
-        await _dbContext.SaveChangesAsync(cancellationToken);
-
-        // Generate email verification token
-        var verificationToken = await _emailVerificationService.GenerateVerificationTokenAsync(user.Id, cancellationToken);
-
-        // Log the verification token (in production, this would be sent via email)
-        _logger.LogInformation("Email verification token generated for user {UserId} ({Email}): {Token}",
-            user.Id, user.Email, verificationToken);
-
-        // Log security event
-        await _securityEventService.LogEventAsync(
-            SecurityEventType.UserRegistered,
-            userId: user.Id,
-            metadata: $"Email: {user.Email}",
-            cancellationToken: cancellationToken);
+        // Log security event outside the transaction (non-critical, should not fail registration)
+        try
+        {
+            await _securityEventService.LogEventAsync(
+                SecurityEventType.UserRegistered,
+                userId: user.Id,
+                metadata: $"Email: {user.Email}",
+                cancellationToken: cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to log security event for user registration {UserId}", user.Id);
+        }
 
         return new RegisterResponse
         {
@@ -101,6 +115,25 @@ public class RegistrationService : IRegistrationService
             LastName = user.LastName,
             CreatedAt = user.CreatedAt
         };
+    }
+
+    private async Task ExecuteRegistrationCoreAsync(User user, CancellationToken cancellationToken)
+    {
+        // Persist the user
+        await _userRepository.AddAsync(user, cancellationToken);
+
+        // Assign default role
+        await AssignDefaultRoleAsync(user, cancellationToken);
+
+        // Save user and role
+        await _dbContext.SaveChangesAsync(cancellationToken);
+
+        // Generate email verification token (participates in the same transaction)
+        var verificationToken = await _emailVerificationService.GenerateVerificationTokenAsync(user.Id, cancellationToken);
+
+        // Log the verification token (in production, this would be sent via email)
+        _logger.LogInformation("Email verification token generated for user {UserId} ({Email}): {Token}",
+            user.Id, user.Email, verificationToken);
     }
 
     private async Task AssignDefaultRoleAsync(User user, CancellationToken cancellationToken)

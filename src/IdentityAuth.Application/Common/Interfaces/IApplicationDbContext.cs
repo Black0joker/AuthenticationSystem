@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 
 namespace IdentityAuth.Application.Common.Interfaces;
 
@@ -13,6 +14,8 @@ public interface IApplicationDbContext
     DbSet<Domain.Entities.EmailVerificationToken> EmailVerificationTokens { get; }
     DbSet<Domain.Entities.PasswordResetToken> PasswordResetTokens { get; }
     DbSet<Domain.Entities.SecurityEvent> SecurityEvents { get; }
+
+    DatabaseFacade Database { get; }
 
     Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 }
