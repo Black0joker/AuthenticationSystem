@@ -73,24 +73,35 @@ public class RegistrationService : IRegistrationService
         // Wrap user creation, role assignment, and token generation in a transaction
         // to prevent inconsistent state if any step fails.
         // Transactions are only supported on relational providers (skipped for InMemory in tests).
-        if (_dbContext.Database.IsRelational())
+        try
         {
-            await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+            if (_dbContext.Database.IsRelational())
+            {
+                await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-            try
+                try
+                {
+                    await ExecuteRegistrationCoreAsync(user, cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    throw;
+                }
+            }
+            else
             {
                 await ExecuteRegistrationCoreAsync(user, cancellationToken);
-                await transaction.CommitAsync(cancellationToken);
-            }
-            catch
-            {
-                await transaction.RollbackAsync(cancellationToken);
-                throw;
             }
         }
-        else
+        catch (DbUpdateException ex)
         {
-            await ExecuteRegistrationCoreAsync(user, cancellationToken);
+            // Handle race condition: another request inserted the same email between
+            // our ExistsByEmailNormalizedAsync check and the actual INSERT.
+            // The unique index on NormalizedEmail catches this at the DB level.
+            _logger.LogWarning(ex, "Concurrent registration detected for email {Email}", normalizedEmail);
+            throw new DuplicateEmailException("An account with this email already exists.");
         }
 
         // Log security event outside the transaction (non-critical, should not fail registration)
