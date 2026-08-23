@@ -3,6 +3,7 @@ using IdentityAuth.Application.Common.Settings;
 using IdentityAuth.Infrastructure.Persistence;
 using IdentityAuth.Infrastructure.Persistence.Repositories;
 using IdentityAuth.Infrastructure.Security;
+using IdentityAuth.Infrastructure.Services;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -56,6 +57,9 @@ public static class DependencyInjection
         configuration.Bind(JwtSettings.SectionName, jwtSettings);
         services.AddSingleton(jwtSettings);
         services.AddSingleton<IJwtTokenService, JwtTokenService>();
+
+        // Register background token cleanup service
+        services.AddHostedService<TokenCleanupService>();
 
         return services;
     }
