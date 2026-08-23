@@ -74,6 +74,36 @@ builder.Services.AddAuthentication(options =>
 
     options.Events = new JwtBearerEvents
     {
+        OnTokenValidated = async context =>
+        {
+            var userRepository = context.HttpContext.RequestServices.GetRequiredService<IdentityAuth.Application.Common.Interfaces.IUserRepository>();
+
+            var userIdClaim = context.Principal?.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                           ?? context.Principal?.FindFirst("sub")?.Value;
+            var securityStampClaim = context.Principal?.FindFirst("security_stamp")?.Value;
+
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                context.Fail("Invalid token: missing user identifier.");
+                return;
+            }
+
+            // If the token has no security stamp (legacy token), reject it
+            if (string.IsNullOrEmpty(securityStampClaim))
+            {
+                context.Fail("Invalid token: missing security stamp.");
+                return;
+            }
+
+            // Validate security stamp against the database
+            var currentStamp = await userRepository.GetSecurityStampAsync(userId, context.HttpContext.RequestAborted);
+
+            if (currentStamp is null || currentStamp != securityStampClaim)
+            {
+                context.Fail("Token has been invalidated. Please log in again.");
+                return;
+            }
+        },
         OnChallenge = context =>
         {
             context.HandleResponse();
