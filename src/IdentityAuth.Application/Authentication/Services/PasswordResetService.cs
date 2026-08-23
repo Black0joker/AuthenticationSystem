@@ -2,13 +2,14 @@ using IdentityAuth.Application.Authentication.DTOs;
 using IdentityAuth.Application.Common.Helpers;
 using IdentityAuth.Application.Common.Interfaces;
 using IdentityAuth.Domain.Entities;
+using Microsoft.Extensions.Logging;
 
 namespace IdentityAuth.Application.Authentication.Services;
 
 public class PasswordResetService : IPasswordResetService
 {
     private static readonly TimeSpan ResetTokenLifetime = TimeSpan.FromHours(1);
-
+    private readonly ILogger<PasswordResetService> _logger;
     private readonly IUserRepository _userRepository;
     private readonly IPasswordResetTokenRepository _resetTokenRepository;
     private readonly IPasswordHasher _passwordHasher;
@@ -17,7 +18,8 @@ public class PasswordResetService : IPasswordResetService
     private readonly ISecurityEventService _securityEventService;
     private readonly IApplicationDbContext _dbContext;
 
-    public PasswordResetService(
+
+    public PasswordResetService(ILogger<PasswordResetService> logger,
         IUserRepository userRepository,
         IPasswordResetTokenRepository resetTokenRepository,
         IPasswordHasher passwordHasher,
@@ -26,6 +28,7 @@ public class PasswordResetService : IPasswordResetService
         ISecurityEventService securityEventService,
         IApplicationDbContext dbContext)
     {
+        _logger = logger;
         _userRepository = userRepository;
         _resetTokenRepository = resetTokenRepository;
         _passwordHasher = passwordHasher;
@@ -56,7 +59,9 @@ public class PasswordResetService : IPasswordResetService
         await _resetTokenRepository.InvalidateAllUserTokensAsync(user.Id, cancellationToken);
 
         // Generate new reset token
-        await GenerateResetTokenAsync(user.Id, cancellationToken);
+        var resetToken=await GenerateResetTokenAsync(user.Id, cancellationToken);
+
+        _logger.LogInformation($"the reset token of the email : {user.Email} ==> {resetToken}");
 
         // Log security event
         await _securityEventService.LogEventAsync(
@@ -66,6 +71,8 @@ public class PasswordResetService : IPasswordResetService
             cancellationToken: cancellationToken);
 
         await _dbContext.SaveChangesAsync(cancellationToken);
+
+
 
         return new ForgotPasswordResponse
         {
