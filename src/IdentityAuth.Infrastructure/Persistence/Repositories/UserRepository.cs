@@ -39,7 +39,7 @@ public class UserRepository : IUserRepository
         return await _context.Users
             .AnyAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken);
     }
-
+    
     public async Task<string?> GetSecurityStampAsync(Guid userId, CancellationToken cancellationToken = default)
     {
         return await _context.Users

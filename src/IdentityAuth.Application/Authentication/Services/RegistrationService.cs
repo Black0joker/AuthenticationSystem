@@ -77,18 +77,22 @@ public class RegistrationService : IRegistrationService
         {
             if (_dbContext.Database.IsRelational())
             {
-                await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
+                var strategy = _dbContext.Database.CreateExecutionStrategy();
+                await strategy.ExecuteAsync(async () =>
+                {
+                    await using var transaction = await _dbContext.Database.BeginTransactionAsync(cancellationToken);
 
-                try
-                {
-                    await ExecuteRegistrationCoreAsync(user, cancellationToken);
-                    await transaction.CommitAsync(cancellationToken);
-                }
-                catch
-                {
-                    await transaction.RollbackAsync(cancellationToken);
-                    throw;
-                }
+                    try
+                    {
+                        await ExecuteRegistrationCoreAsync(user, cancellationToken);
+                        await transaction.CommitAsync(cancellationToken);
+                    }
+                    catch
+                    {
+                        await transaction.RollbackAsync(cancellationToken);
+                        throw;
+                    }
+                });
             }
             else
             {

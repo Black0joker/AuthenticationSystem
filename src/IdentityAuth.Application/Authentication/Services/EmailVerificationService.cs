@@ -28,10 +28,6 @@ public class EmailVerificationService : IEmailVerificationService
 
     public async Task<string> GenerateVerificationTokenAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        // Verify user exists
-        var user = await _dbContext.Users
-            .FirstOrDefaultAsync(u => u.Id == userId, cancellationToken)
-            ?? throw new KeyNotFoundException("User not found.");
 
         // Invalidate any existing tokens for this user
         await _tokenRepository.InvalidateUserTokensAsync(userId, cancellationToken);
@@ -96,8 +92,7 @@ public class EmailVerificationService : IEmailVerificationService
         verificationToken.UsedAt = DateTime.UtcNow;
 
         // Mark user's email as verified
-        var user = await _dbContext.Users
-            .FirstOrDefaultAsync(u => u.Id == verificationToken.UserId, cancellationToken);
+        var user = verificationToken.User;
 
         if (user is null)
         {

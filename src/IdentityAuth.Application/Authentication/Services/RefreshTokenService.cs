@@ -47,7 +47,7 @@ public class RefreshTokenService : IRefreshTokenService
         };
 
         await _refreshTokenRepository.AddAsync(refreshToken, cancellationToken);
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        //await _dbContext.SaveChangesAsync(cancellationToken);
 
         return plainToken;
     }
@@ -91,12 +91,7 @@ public class RefreshTokenService : IRefreshTokenService
         }
 
         // Get the user
-        var user = await _dbContext.Users.FindAsync(new object[] { storedToken.UserId }, cancellationToken);
-
-        if (user is null)
-        {
-            throw new InvalidRefreshTokenException("User associated with this token no longer exists.");
-        }
+        var user = storedToken.User;
 
         // ROTATION: Revoke the current token and create a new one
         await _refreshTokenRepository.RevokeAsync(storedToken, ipAddress, cancellationToken);
@@ -121,6 +116,8 @@ public class RefreshTokenService : IRefreshTokenService
 
         // Generate new access token
         var accessToken = _jwtTokenService.GenerateAccessToken(user);
+
+        user.SecurityStamp=Guid.NewGuid().ToString(); // Invalidate existing sessions (if using SecurityStamp for session validation)
 
         await _dbContext.SaveChangesAsync(cancellationToken);
 
