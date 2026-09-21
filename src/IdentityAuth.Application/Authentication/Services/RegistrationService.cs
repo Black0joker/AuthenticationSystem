@@ -141,7 +141,7 @@ public class RegistrationService : IRegistrationService
         await AssignDefaultRoleAsync(user, cancellationToken);
 
         // Save user and role
-        await _dbContext.SaveChangesAsync(cancellationToken);
+        //await _dbContext.SaveChangesAsync(cancellationToken);
 
         // Generate email verification token (participates in the same transaction)
         var verificationToken = await _emailVerificationService.GenerateVerificationTokenAsync(user.Id, cancellationToken);
