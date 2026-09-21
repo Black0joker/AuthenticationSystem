@@ -31,7 +31,7 @@ public class RefreshTokenService : IRefreshTokenService
         _securityEventService = securityEventService;
     }
 
-    public async Task<string> GenerateRefreshTokenAsync(Guid userId, string? ipAddress = null, Guid? familyId = null, CancellationToken cancellationToken = default)
+    public async Task<(string,Guid)> GenerateRefreshTokenAsync(Guid userId, string? ipAddress = null, Guid? familyId = null, CancellationToken cancellationToken = default)
     {
         var plainToken = _tokenGenerator.GenerateToken(64);
         var tokenHash = _tokenHasher.HashToken(plainToken);
@@ -47,9 +47,9 @@ public class RefreshTokenService : IRefreshTokenService
         };
 
         await _refreshTokenRepository.AddAsync(refreshToken, cancellationToken);
-        //await _dbContext.SaveChangesAsync(cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
 
-        return plainToken;
+        return new (plainToken, refreshToken.Id);
     }
 
     public async Task<RefreshTokenResponse> RefreshTokenAsync(RefreshTokenRequest request, string? ipAddress = null, CancellationToken cancellationToken = default)
@@ -105,14 +105,14 @@ public class RefreshTokenService : IRefreshTokenService
             cancellationToken: cancellationToken);
 
         // Generate new refresh token in the same family
-        var newPlainToken = await GenerateRefreshTokenAsync(
+        var (newPlainToken, newRefreshTokenId) = await GenerateRefreshTokenAsync(
             storedToken.UserId,
             ipAddress,
             storedToken.FamilyId,
             cancellationToken);
 
         // Link the old token to the new one
-        storedToken.ReplacedByTokenId = null; // Will be set after we know the new token's ID
+        storedToken.ReplacedByTokenId = newRefreshTokenId; // Will be set after we know the new token's ID
 
         // Generate new access token
         var accessToken = _jwtTokenService.GenerateAccessToken(user);

@@ -50,6 +50,12 @@ public class LoginService : ILoginService
             throw new AuthenticationException("Invalid email or password.");
         }
 
+        // Check if email is verified
+        if (!user.IsEmailVerified)
+        {
+            throw new EmailNotVerifiedException("Please verify your email address before logging in.");
+        }
+
         // Check if account is locked
         if (user.IsLocked)
         {
@@ -104,11 +110,7 @@ public class LoginService : ILoginService
             throw new AuthenticationException("Invalid email or password.");
         }
 
-        // Check if email is verified
-        if (!user.IsEmailVerified)
-        {
-            throw new EmailNotVerifiedException("Please verify your email address before logging in.");
-        }
+        
 
         // Reset failed login attempts on successful login
         user.FailedLoginAttempts = 0;
